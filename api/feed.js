@@ -102,6 +102,21 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Short canva.link links: follow the redirect to get the full
+  // canva.com/design/... address, so the grid can show the preview.
+  await Promise.all(
+    posts.map(async (p) => {
+      if (!p.canva || !/^https?:\/\/(www\.)?canva\.link\//i.test(p.canva)) return;
+      try {
+        const r = await fetch(p.canva, { method: "HEAD", redirect: "manual" });
+        const loc = r.headers.get("location");
+        if (loc && /canva\.com\/design\//.test(loc)) p.canva = loc;
+      } catch (e) {
+        // Keep the short link if Canva can't be reached.
+      }
+    })
+  );
+
   res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=60");
   res.status(200).json({ posts, updated: new Date().toISOString() });
 };
