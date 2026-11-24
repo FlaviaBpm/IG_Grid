@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instagram grid preview</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #000000;
+    --muted: #737373;
+    --line: #dbdbdb;
+    --tile: #efefef;
+    --chip-bg: rgba(255,255,255,0.92);
+    --chip-text: #000000;
+    --s-todo: #9b9a97;
+    --s-doing: #2f80ed;
+    --s-review: #e0a800;
+    --s-ok: #2e9e5b;
+    --s-scheduled: #8e5cd9;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --text: #f5f5f5;
+      --muted: #a8a8a8;
+      --line: #262626;
+      --tile: #1c1c1c;
+      --chip-bg: rgba(0,0,0,0.78);
+      --chip-text: #f5f5f5;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px 0 32px; }
+
+  header { padding: 0 12px 12px; }
+  .brands { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 4px; }
+  .brands button {
+    background: none; border: 0; padding: 4px 0; cursor: pointer;
+    font: inherit; font-weight: 600; font-size: 15px; color: var(--muted);
+    border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .brands button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
+  .brands button:focus-visible, .tools button:focus-visible, .tile:focus-visible, .tools label:focus-within {
+    outline: 2px solid var(--s-doing); outline-offset: 2px;
+  }
+  .meta { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  .counts { color: var(--muted); }
+  .counts strong { color: var(--text); }
+  .tools { display: flex; gap: 14px; align-items: center; }
+  .tools label { display: flex; gap: 6px; align-items: center; cursor: pointer; color: var(--muted); }
+  .tools button {
+    background: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px;
+    font: inherit; font-weight: 600; color: var(--text); cursor: pointer;
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; border-top: 1px solid var(--line); padding-top: 2px; }
+  .tile {
+    position: relative; aspect-ratio: 3 / 4; background: var(--tile); overflow: hidden;
+    border: 0; padding: 0; cursor: pointer; display: block; width: 100%; color: inherit; font: inherit;
+  }
+  .tile img, .tile iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: cover; }
+  .tile iframe { pointer-events: none; }
+  .tile .empty {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 10px; text-align: center; color: var(--muted); font-size: 12px;
+  }
+  .tile .chip {
+    position: absolute; left: 6px; top: 6px; display: flex; align-items: center; gap: 5px;
+    background: var(--chip-bg); color: var(--chip-text); border-radius: 10px; padding: 2px 7px 2px 5px;
+    font-size: 11px; font-weight: 600; max-width: calc(100% - 40px);
+  }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile .kind { position: absolute; right: 6px; top: 6px; width: 18px; height: 18px; color: #fff; filter: drop-shadow(0 0 2px rgba(0,0,0,0.6)); }
+  .tile .date {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 5px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.55)); color: #fff; font-size: 11px; font-weight: 600; text-align: left;
+  }
+  .tile.published .date { display: none; }
+
+  .notice { padding: 40px 16px; text-align: center; color: var(--muted); }
+  .notice strong { display: block; color: var(--text); margin-bottom: 4px; }
+
+  dialog {
+    border: 0; padding: 0; border-radius: 12px; background: var(--bg); color: var(--text);
+    width: min(92vw, 460px); max-height: 92vh;
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.6); }
+  .viewer { position: relative; aspect-ratio: 4 / 5; background: var(--tile); }
+  .viewer iframe, .viewer img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; }
+  .info { padding: 14px 16px 16px; }
+  .info h2 { font-size: 16px; margin: 0 0 6px; }
+  .info p { margin: 0 0 4px; color: var(--muted); }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .actions a, .actions button {
+    flex: 1; text-align: center; text-decoration: none; padding: 8px 10px; border-radius: 8px;
+    font: inherit; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: none; color: var(--text);
+  }
+  .actions a.primary { background: var(--s-doing); border-color: var(--s-doing); color: #fff; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    dialog[open] { animation: pop 160ms ease-out; }
+    @keyframes pop { from { transform: scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <nav class="brands" id="brands" aria-label="Accounts"></nav>
+    <div class="meta">
+      <div class="counts" id="counts"></div>
+      <div class="tools">
+        <label><input type="checkbox" id="showPublished" checked> Show published</label>
+        <button type="button" id="refresh">Refresh</button>
+      </div>
+    </div>
+  </header>
+  <main class="grid" id="grid" aria-live="polite"></main>
+  <div class="notice" id="notice" hidden></div>
+</div>
+
+<dialog id="dialog" aria-label="Post preview">
+  <div class="viewer" id="viewer"></div>
+  <div class="info">
+    <h2 id="dTitle"></h2>
+    <p id="dMeta"></p>
+    <p id="dClient"></p>
+    <div class="actions">
+      <a id="dNotion" class="primary" target="_blank" rel="noopener">Open in Notion</a>
+      <a id="dCanva" target="_blank" rel="noopener">Open in Canva</a>
+      <button type="button" id="dClose">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var DEMO = location.protocol === "file:" || params.has("demo");
+  var KEY = params.get("key");
+
+  var STATUS = {
+    "Pas commencé": "var(--s-todo)",
+    "En cours": "var(--s-doing)",
+    "En attente de validation": "var(--s-review)",
+    "Validé": "var(--s-ok)",
+    "Programmé": "var(--s-scheduled)"
+  };
+  var ICONS = {
+    reel: '<svg class="kind" viewBox="0 0 24 24" fill="currentColor" aria-label="Reel"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm6 5v6l5-3-5-3z"/></svg>',
+    carousel: '<svg class="kind" viewBox="0 0 24 24" fill="currentColor" aria-label="Carousel"><path d="M8 2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM2 8v12a2 2 0 0 0 2 2h12v-2H4V8H2z"/></svg>'
+  };
+
+  var state = { posts: [], brand: params.get("brand") || "", showPublished: true };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(s) {
+    return String(s || "").replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // Turns any Canva design link into its embeddable "?embed" version.
+  function canvaEmbed(u) {
+    if (!u) return null;
+    try {
+      var x = new URL(u);
+      if (!/(^|\.)canva\.com$/.test(x.hostname)) return null;
+      var m = x.pathname.match(/\/design\/([^/]+)\/([^/]+)/);
+      if (!m) return null;
+      return "https://www.canva.com/design/" + m[1] + "/" + m[2] + "/view?embed";
+    } catch (e) { return null; }
+  }
+
+  function fmtDate(d) {
+    if (!d) return "No date";
+    var dt = new Date(d.length === 10 ? d + "T12:00:00" : d);
+    return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  }
+
+  function kindOf(type) {
+    if (/reel/i.test(type)) return "reel";
+    if (/carous|carrous/i.test(type)) return "carousel";
+    return "";
+  }
+
+  function visiblePosts() {
+    return state.posts
+      .filter(function (p) { return !state.brand || p.brand === state.brand; })
+      .filter(function (p) { return p.type !== "Story"; })
+      .filter(function (p) { return state.showPublished || p.status !== "Publié"; })
+      .sort(function (a, b) {
+        if (!a.date && !b.date) return 0;
+        if (!a.date) return -1;
+        if (!b.date) return 1;
+        return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
+      });
+  }
+
+  function renderBrands() {
+    var brands = [];
+    state.posts.forEach(function (p) { if (p.brand && brands.indexOf(p.brand) < 0) brands.push(p.brand); });
+    if (state.brand && brands.indexOf(state.brand) < 0) state.brand = "";
+    var list = [""].concat(brands);
+    $("brands").innerHTML = list.map(function (b) {
+      return '<button type="button" data-brand="' + esc(b) + '" aria-pressed="' + (b === state.brand) + '">' + esc(b || "All accounts") + "</button>";
+    }).join("");
+  }
+
+  function renderGrid() {
+    var posts = visiblePosts();
+    var scoped = state.posts.filter(function (p) { return (!state.brand || p.brand === state.brand) && p.type !== "Story"; });
+    var published = scoped.filter(function (p) { return p.status === "Publié"; }).length;
+    $("counts").innerHTML = "<strong>" + (scoped.length - published) + "</strong> planned, <strong>" + published + "</strong> published";
+
+    if (!posts.length) {
+      $("grid").innerHTML = "";
+      showNotice("No Instagram posts here yet", "Add a post in the Master Content Calendar with Canal set to Instagram, then press Refresh.");
+      return;
+    }
+    $("notice").hidden = true;
+
+    $("grid").innerHTML = posts.map(function (p, i) {
+      var embed = canvaEmbed(p.canva);
+      var media = embed
+        ? '<iframe src="' + esc(embed) + '" loading="lazy" tabindex="-1" title=""></iframe>'
+        : p.cover
+          ? '<img src="' + esc(p.cover) + '" alt="" loading="lazy">'
+          : '<div class="empty">' + esc(p.title || "Untitled") + "</div>";
+      var isPub = p.status === "Publié";
+      var chip = isPub ? "" : '<div class="chip"><i style="background:' + (STATUS[p.status] || "var(--s-todo)") + '"></i><span>' + esc(p.status) + "</span></div>";
+      var kind = ICONS[kindOf(p.type)] || "";
+      var brandNote = state.brand ? "" : " " + esc(p.brand);
+      return '<button type="button" class="tile' + (isPub ? " published" : "") + '" data-i="' + i + '" aria-label="' + esc((p.title || "Untitled") + ", " + p.status + ", " + fmtDate(p.date)) + '">' +
+        media + chip + kind + '<div class="date">' + fmtDate(p.date) + brandNote + "</div></button>";
+    }).join("");
+    state.shown = posts;
+  }
+
+  function showNotice(title, text) {
+    $("notice").innerHTML = "<strong>" + esc(title) + "</strong>" + esc(text);
+    $("notice").hidden = false;
+  }
+
+  function openPost(p) {
+    var embed = canvaEmbed(p.canva);
+    $("viewer").innerHTML = embed
+      ? '<iframe src="' + esc(embed) + '" allowfullscreen title="Canva design"></iframe>'
+      : p.cover ? '<img src="' + esc(p.cover) + '" alt="">' : "";
+    $("dTitle").textContent = p.title || "Untitled";
+    $("dMeta").textContent = [p.brand, p.type, p.status, fmtDate(p.date)].filter(Boolean).join(", ");
+    $("dClient").textContent = p.client ? "Client: " + p.client : "";
+    $("dNotion").href = p.url || "#";
+    $("dNotion").hidden = !p.url;
+    $("dCanva").href = p.canva || "#";
+    $("dCanva").hidden = !p.canva;
+    $("dialog").showModal();
+  }
+
+  function load() {
+    $("refresh").disabled = true;
+    var req = DEMO
+      ? Promise.resolve(demoData())
+      : fetch("/api/feed" + (KEY ? "?key=" + encodeURIComponent(KEY) : ""), { cache: "no-store" })
+          .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "The feed could not be loaded."); return d; }); });
+    req.then(function (d) {
+      state.posts = d.posts || [];
+      renderBrands();
+      renderGrid();
+    }).catch(function (e) {
+      $("grid").innerHTML = "";
+      showNotice("The grid could not load", e.message);
+    }).then(function () { $("refresh").disabled = false; });
+  }
+
+  function demoData() {
+    var colors = ["#e8d5c4", "#1f3a5f", "#f2c14e", "#d64933", "#a7c4a0", "#2b2d42", "#f7b2bd", "#5e548e", "#89b0ae"];
+    var statuses = ["Pas commencé", "En cours", "En attente de validation", "Validé", "Programmé", "Publié", "Publié", "Publié", "Publié"];
+    var types = ["Carousel", "Photo", "Reel", "Product Showcase", "Photo", "Carousel", "Reel", "Photo", "Polaroid"];
+    var brands = ["Waltex", "Squarenuts BE", "Boost Up"];
+    var posts = [];
+    for (var i = 0; i < 18; i++) {
+      var day = new Date(2026, 11, 20 - i * 3);
+      var c = colors[i % colors.length];
+      var svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 3 4'><rect width='3' height='4' fill='" + c + "'/></svg>";
+      posts.push({
+        id: "demo" + i, url: "", title: "Demo post " + (i + 1), brand: brands[i % 3],
+        type: types[i % types.length], status: statuses[i % statuses.length],
+        date: day.toISOString().slice(0, 10), canva: null, client: "",
+        cover: "data:image/svg+xml," + encodeURIComponent(svg)
+      });
+    }
+    return { posts: posts };
+  }
+
+  $("brands").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    state.brand = b.getAttribute("data-brand");
+    renderBrands();
+    renderGrid();
+  });
+  $("grid").addEventListener("click", function (e) {
+    var t = e.target.closest(".tile");
+    if (t) openPost(state.shown[+t.getAttribute("data-i")]);
+  });
+  $("showPublished").addEventListener("change", function (e) {
+    state.showPublished = e.target.checked;
+    renderGrid();
+  });
+  $("refresh").addEventListener("click", load);
+  $("dClose").addEventListener("click", function () { $("dialog").close(); });
+  $("dialog").addEventListener("close", function () { $("viewer").innerHTML = ""; });
+  $("dialog").addEventListener("click", function (e) { if (e.target === $("dialog")) $("dialog").close(); });
+
+  load();
+})();
+</script>
+</body>
+</html>
